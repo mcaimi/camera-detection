@@ -1,0 +1,39 @@
+---
+params:
+  url: "s3_endpoint"
+  accessKey: "accesskey"
+  secretKey: "secretkey"
+  api: "s3v4"
+  path: "auto"
+  preferDevice: "cuda"
+  streamOperation: True
+  captureDevice: 0
+
+huggingface:
+  modelName: "Ultralytics/YOLO11"
+  apiToken: "apiToken"
+  hfHomePath: "/tmp/"
+  modelsPath: "model_checkpoints"
+  filenames:
+      - "yolo11x.pt"
+  modelBucket: "models"
+  modelType: "mistral"
+
+s3:
+  multipart_threshold_gb: 5
+  use_thread: False
+  bucket_list:
+      - "models"
+      - "artifacts"
+      - "pipelines"
+      - "trainingdata"
+      - "onnx"
+      - "quantized"
+
+training_data:
+  path: "/tmp/training_data"
+  trainingDataBucket: "trainingdata"
+  pattern: "**/*.txt"
+  chunk_size: 1000
+  chunk_overlap: 0
+
