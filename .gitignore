@@ -1,5 +1,6 @@
-model_checkpoints/**
+**/model_checkpoints/**
 **/__pycache__/**
+jupyter/runs/**
 *.pyc
 *.local
 .DS_Store
