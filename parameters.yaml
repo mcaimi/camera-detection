@@ -16,24 +16,15 @@ huggingface:
   modelsPath: "model_checkpoints"
   filenames:
       - "yolo11x.pt"
-  modelBucket: "models"
-  modelType: "mistral"
+  modelBucket: "yolo-models"
+  onnxBucket: "onnx"
+  modelType: "yolo"
 
 s3:
   multipart_threshold_gb: 5
   use_thread: False
   bucket_list:
-      - "models"
-      - "artifacts"
+      - "yolo-models"
       - "pipelines"
       - "trainingdata"
       - "onnx"
-      - "quantized"
-
-training_data:
-  path: "/tmp/training_data"
-  trainingDataBucket: "trainingdata"
-  pattern: "**/*.txt"
-  chunk_size: 1000
-  chunk_overlap: 0
-
