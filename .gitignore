@@ -1,6 +1,10 @@
 **/model_checkpoints/**
 **/__pycache__/**
 jupyter/runs/**
+jupyter/.env
+jupyter/kaggle.json
+jupyter/training.yaml
+**/kaggle/**
 *.pyc
 *.local
 .DS_Store
