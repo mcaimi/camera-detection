@@ -3,6 +3,7 @@
 jupyter/runs/**
 jupyter/.env
 jupyter/kaggle.json
+jupyter/credentials.json
 jupyter/training.yaml
 **/kaggle/**
 *.pyc
