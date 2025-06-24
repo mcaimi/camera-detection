@@ -9,6 +9,17 @@ The project is composed of mainly two distinct pieces:
 
 At this point, I am using a public Drone Image dataset found on Kaggle to finetune the YOLO model.
 
+### Kaggle credentials
+
+Create a `.env` file under the `jupyter/` folder with these contents:
+
+```bash
+# API keys to interact with kaggle repositories
+KAGGLE_USERNAME="kaggle_username"
+KAGGLE_KEY="kaggle_apikey"
+KAGGLEHUB_CACHE="local_cache_path"
+```
+
 ### Elyra Pipelines
 
 Pipeline for automatic/scheduled finetuning are being developed under Jupyter and Elyra on Openshift AI.
