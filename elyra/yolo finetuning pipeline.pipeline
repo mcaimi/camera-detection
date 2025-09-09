@@ -1,0 +1,531 @@
+{
+  "doc_type": "pipeline",
+  "version": "3.0",
+  "json_schema": "http://api.dataplatform.ibm.com/schemas/common-pipeline/pipeline-flow/pipeline-flow-v3-schema.json",
+  "id": "elyra-auto-generated-pipeline",
+  "primary_pipeline": "primary",
+  "pipelines": [
+    {
+      "id": "primary",
+      "nodes": [
+        {
+          "id": "8c6c3ceb-84b4-4813-b594-b0a9eec509ae",
+          "type": "execution_node",
+          "op": "execute-notebook-node",
+          "app_data": {
+            "component_parameters": {
+              "dependencies": [],
+              "include_subdirectories": false,
+              "outputs": [],
+              "env_vars": [
+                {
+                  "env_var": "KAGGLEHUB_CACHE",
+                  "value": "/opt/app-root/src/"
+                }
+              ],
+              "kubernetes_pod_annotations": [],
+              "kubernetes_pod_labels": [],
+              "kubernetes_secrets": [
+                {
+                  "env_var": "KAGGLE_USERNAME",
+                  "name": "yolo-kaggle",
+                  "key": "KAGGLE_USERNAME"
+                },
+                {
+                  "env_var": "KAGGLE_KEY",
+                  "name": "yolo-kaggle",
+                  "key": "KAGGLE_KEY"
+                },
+                {
+                  "env_var": "DATASET_NAME",
+                  "name": "yolo-kaggle",
+                  "key": "DATASET_NAME"
+                }
+              ],
+              "kubernetes_shared_mem_size": {},
+              "kubernetes_tolerations": [],
+              "mounted_volumes": [
+                {
+                  "path": "/opt/app-root/src/",
+                  "pvc_name": "pipeline-pvc",
+                  "read_only": false
+                }
+              ],
+              "filename": "1 - Download Dataset.ipynb",
+              "runtime_image": "quay.io/modh/odh-pipeline-runtime-minimal-cpu-py311-ubi9@sha256:23372eb8b753bcbd3b6b60cddcb9e459da96e52a458c6d2e99b364fd325478c1",
+              "gpu": 0
+            },
+            "label": "Prepare Dataset",
+            "ui_data": {
+              "label": "Prepare Dataset",
+              "image": "/notebook/yolo-finetune/yolo-finetune/static/elyra/notebook.svg",
+              "x_pos": 50,
+              "y_pos": 50,
+              "description": "Run notebook file"
+            }
+          },
+          "inputs": [
+            {
+              "id": "inPort",
+              "app_data": {
+                "ui_data": {
+                  "cardinality": {
+                    "min": 0,
+                    "max": -1
+                  },
+                  "label": "Input Port"
+                }
+              }
+            }
+          ],
+          "outputs": [
+            {
+              "id": "outPort",
+              "app_data": {
+                "ui_data": {
+                  "cardinality": {
+                    "min": 0,
+                    "max": -1
+                  },
+                  "label": "Output Port"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "78241ee0-be97-4c2c-bcc9-74c51ff1c3e7",
+          "type": "execution_node",
+          "op": "execute-notebook-node",
+          "app_data": {
+            "component_parameters": {
+              "dependencies": [],
+              "include_subdirectories": false,
+              "outputs": [],
+              "env_vars": [
+                {
+                  "env_var": "ULTRALYTICS_DIR",
+                  "value": "/opt/app-root/src/"
+                },
+                {
+                  "env_var": "YOLO_CHECKPOINT",
+                  "value": "Ultralytics/YOLO11"
+                }
+              ],
+              "kubernetes_pod_annotations": [],
+              "kubernetes_pod_labels": [],
+              "kubernetes_secrets": [
+                {
+                  "env_var": "HF_TOKEN",
+                  "name": "huggingface-secret",
+                  "key": "HF_TOKEN"
+                }
+              ],
+              "kubernetes_shared_mem_size": {},
+              "kubernetes_tolerations": [],
+              "mounted_volumes": [
+                {
+                  "path": "/opt/app-root/src/",
+                  "pvc_name": "pipeline-pvc",
+                  "read_only": false
+                }
+              ],
+              "filename": "2 - Download Base Model.ipynb",
+              "gpu": 0,
+              "runtime_image": "quay.io/modh/odh-pipeline-runtime-minimal-cpu-py311-ubi9@sha256:23372eb8b753bcbd3b6b60cddcb9e459da96e52a458c6d2e99b364fd325478c1"
+            },
+            "label": "Download Checkpoint",
+            "ui_data": {
+              "label": "Download Checkpoint",
+              "image": "/notebook/yolo-finetune/yolo-finetune/static/elyra/notebook.svg",
+              "x_pos": 422,
+              "y_pos": 268,
+              "description": "Run notebook file"
+            }
+          },
+          "inputs": [
+            {
+              "id": "inPort",
+              "app_data": {
+                "ui_data": {
+                  "cardinality": {
+                    "min": 0,
+                    "max": -1
+                  },
+                  "label": "Input Port"
+                }
+              },
+              "links": [
+                {
+                  "id": "6e175d43-c053-41d5-be2a-60637e9bd773",
+                  "node_id_ref": "8c6c3ceb-84b4-4813-b594-b0a9eec509ae",
+                  "port_id_ref": "outPort"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "id": "outPort",
+              "app_data": {
+                "ui_data": {
+                  "cardinality": {
+                    "min": 0,
+                    "max": -1
+                  },
+                  "label": "Output Port"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "f67cc1f7-bf60-40fa-b6c1-3faf863d5fbc",
+          "type": "execution_node",
+          "op": "execute-notebook-node",
+          "app_data": {
+            "component_parameters": {
+              "dependencies": [],
+              "include_subdirectories": false,
+              "outputs": [],
+              "env_vars": [
+                {
+                  "env_var": "PERSISTENCE_DIR",
+                  "value": "/opt/app-root/src/"
+                },
+                {
+                  "env_var": "YOLO_CHECKPOINT",
+                  "value": "yolo11x.pt"
+                },
+                {
+                  "env_var": "YOLO_CONFIG",
+                  "value": "yolo11x.yaml"
+                },
+                {
+                  "env_var": "JOB_TYPE",
+                  "value": "detect"
+                },
+                {
+                  "env_var": "JOB_NAME",
+                  "value": "train"
+                },
+                {
+                  "env_var": "EPOCHS",
+                  "value": "1"
+                },
+                {
+                  "env_var": "IMG_SIZE",
+                  "value": "640"
+                },
+                {
+                  "env_var": "BATCH",
+                  "value": "2"
+                },
+                {
+                  "env_var": "OPTIMIZER",
+                  "value": "AdamW"
+                },
+                {
+                  "env_var": "KAGGLEHUB_CACHEDIR",
+                  "value": "/opt/app-root/src/"
+                }
+              ],
+              "kubernetes_pod_annotations": [],
+              "kubernetes_pod_labels": [],
+              "kubernetes_secrets": [
+                {
+                  "env_var": "DATASET_NAME",
+                  "name": "yolo-kaggle",
+                  "key": "DATASET_NAME"
+                }
+              ],
+              "kubernetes_shared_mem_size": {},
+              "kubernetes_tolerations": [],
+              "mounted_volumes": [
+                {
+                  "path": "/opt/app-root/src/",
+                  "pvc_name": "pipeline-pvc",
+                  "read_only": false
+                }
+              ],
+              "filename": "3 - Finetune Model.ipynb",
+              "gpu": 0,
+              "gpu_vendor": "nvidia.com/gpu",
+              "runtime_image": "quay.io/modh/odh-pipeline-runtime-datascience-cpu-py311-ubi9@sha256:00dbb78af70bf9bcfb15dad7ae5a1a90e47ac33efbd6573a090cf56531e22ffb",
+              "cpu": 6,
+              "cpu_limit": 6,
+              "memory": 24,
+              "memory_limit": 24
+            },
+            "label": "Run Finetuning",
+            "ui_data": {
+              "label": "Run Finetuning",
+              "image": "/notebook/yolo-finetune/yolo-finetune/static/elyra/notebook.svg",
+              "x_pos": 682,
+              "y_pos": 109,
+              "description": "Run notebook file"
+            }
+          },
+          "inputs": [
+            {
+              "id": "inPort",
+              "app_data": {
+                "ui_data": {
+                  "cardinality": {
+                    "min": 0,
+                    "max": -1
+                  },
+                  "label": "Input Port"
+                }
+              },
+              "links": [
+                {
+                  "id": "0bd52388-4b6e-4588-9bf4-3fdedc331cdc",
+                  "node_id_ref": "78241ee0-be97-4c2c-bcc9-74c51ff1c3e7",
+                  "port_id_ref": "outPort"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "id": "outPort",
+              "app_data": {
+                "ui_data": {
+                  "cardinality": {
+                    "min": 0,
+                    "max": -1
+                  },
+                  "label": "Output Port"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "0e17e2c4-1919-4783-99ac-b8c7c50db29b",
+          "type": "execution_node",
+          "op": "execute-notebook-node",
+          "app_data": {
+            "component_parameters": {
+              "dependencies": [],
+              "include_subdirectories": false,
+              "outputs": [],
+              "env_vars": [
+                {
+                  "env_var": "PERSISTENCE_DIR",
+                  "value": "/opt/app-root/src/"
+                },
+                {
+                  "env_var": "JOB_NAME",
+                  "value": "train"
+                },
+                {
+                  "env_var": "JOB_TYPE",
+                  "value": "detect"
+                },
+                {
+                  "env_var": "YOLO_CHECKPOINT",
+                  "value": "best.onnx"
+                },
+                {
+                  "env_var": "USERNAME",
+                  "value": "USER"
+                },
+                {
+                  "env_var": "CLUSTER_DOMAIN",
+                  "value": "DOMAIN"
+                },
+                {
+                  "env_var": "KF_PIPELINES_SA_TOKEN_PATH",
+                  "value": "/var/run/secrets/kubernetes.io/serviceaccount/token"
+                },
+                {
+                  "env_var": "S3_DEPLOYMENT",
+                  "value": "minio-s3-s3-minio-dev"
+                },
+                {
+                  "env_var": "VERSION",
+                  "value": "1"
+                },
+                {
+                  "env_var": "BUCKET",
+                  "value": "models"
+                },
+                {
+                  "env_var": "MODEL_NAME",
+                  "value": "yolo-finetuned-drones"
+                }
+              ],
+              "kubernetes_pod_annotations": [],
+              "kubernetes_pod_labels": [],
+              "kubernetes_secrets": [
+                {
+                  "env_var": "AWS_S3_ENDPOINT",
+                  "name": "s3-models",
+                  "key": "AWS_S3_ENDPOINT"
+                },
+                {
+                  "env_var": "AWS_ACCESS_KEY_ID",
+                  "name": "s3-models",
+                  "key": "AWS_ACCESS_KEY_ID"
+                },
+                {
+                  "env_var": "AWS_SECRET_ACCESS_KEY",
+                  "name": "s3-models",
+                  "key": "AWS_SECRET_ACCESS_KEY"
+                },
+                {
+                  "env_var": "AWS_S3_BUCKET",
+                  "name": "s3-models",
+                  "key": "AWS_S3_BUCKET"
+                },
+                {
+                  "env_var": "AWS_DEFAULT_REGION",
+                  "name": "s3-models",
+                  "key": "AWS_DEFAULT_REGION"
+                }
+              ],
+              "kubernetes_shared_mem_size": {},
+              "kubernetes_tolerations": [],
+              "mounted_volumes": [
+                {
+                  "path": "/opt/app-root/src/",
+                  "pvc_name": "pipeline-pvc",
+                  "read_only": false
+                }
+              ],
+              "filename": "4 - Upload Finetuned Checkpoint.ipynb",
+              "runtime_image": "quay.io/modh/odh-pipeline-runtime-minimal-cpu-py311-ubi9@sha256:23372eb8b753bcbd3b6b60cddcb9e459da96e52a458c6d2e99b364fd325478c1"
+            },
+            "label": "",
+            "ui_data": {
+              "label": "4 - Upload Finetuned Checkpoint.ipynb",
+              "image": "/notebook/yolo-finetune/yolo-finetune/static/elyra/notebook.svg",
+              "x_pos": 992.9998779296875,
+              "y_pos": 205,
+              "description": "Run notebook file"
+            }
+          },
+          "inputs": [
+            {
+              "id": "inPort",
+              "app_data": {
+                "ui_data": {
+                  "cardinality": {
+                    "min": 0,
+                    "max": -1
+                  },
+                  "label": "Input Port"
+                }
+              },
+              "links": [
+                {
+                  "id": "ef00530d-bd3f-4c64-a79f-8241def281ee",
+                  "node_id_ref": "f67cc1f7-bf60-40fa-b6c1-3faf863d5fbc",
+                  "port_id_ref": "outPort"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "id": "outPort",
+              "app_data": {
+                "ui_data": {
+                  "cardinality": {
+                    "min": 0,
+                    "max": -1
+                  },
+                  "label": "Output Port"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "app_data": {
+        "ui_data": {
+          "comments": [
+            {
+              "id": "9f0cc7ce-fce2-45f4-968c-d9fc376b6215",
+              "x_pos": 689,
+              "y_pos": 210,
+              "width": 175,
+              "height": 79,
+              "content": "Fine tune the downloaded YOLO Model using the new dataset retrieved from Kaggle",
+              "associated_id_refs": [
+                {
+                  "id": "4067f67d-cb2f-4e1f-a28a-4ecfaebf1017",
+                  "node_ref": "f67cc1f7-bf60-40fa-b6c1-3faf863d5fbc"
+                }
+              ]
+            },
+            {
+              "id": "0a946e39-7627-4978-8335-48ede5873104",
+              "x_pos": 346,
+              "y_pos": 37,
+              "width": 175,
+              "height": 71,
+              "content": "Download the pre-trained YOLO checkpoint from Hugging Face",
+              "associated_id_refs": [
+                {
+                  "id": "3450af2e-828d-42be-b9a8-5f476a44d46e",
+                  "node_ref": "78241ee0-be97-4c2c-bcc9-74c51ff1c3e7"
+                }
+              ]
+            },
+            {
+              "id": "cef9b177-3733-4306-97b1-7face64713da",
+              "x_pos": 51,
+              "y_pos": 146,
+              "width": 175,
+              "height": 84,
+              "content": "Download the training Dataset from Kaggle and prepare the filesystem structure",
+              "associated_id_refs": [
+                {
+                  "id": "7df9b8c6-b661-4cba-ae83-31316a78fbe0",
+                  "node_ref": "8c6c3ceb-84b4-4813-b594-b0a9eec509ae"
+                }
+              ]
+            },
+            {
+              "id": "b5973562-af04-4fee-863d-8bb47ddd52ea",
+              "x_pos": 974.9999389648438,
+              "y_pos": 43,
+              "width": 175,
+              "height": 59,
+              "content": "Upload Model to Model Registry",
+              "associated_id_refs": [
+                {
+                  "id": "1f683689-f43a-4946-bd18-039ff4e43589",
+                  "node_ref": "0e17e2c4-1919-4783-99ac-b8c7c50db29b"
+                }
+              ]
+            }
+          ]
+        },
+        "version": 8,
+        "runtime_type": "KUBEFLOW_PIPELINES",
+        "properties": {
+          "name": "yolo finetuning pipeline",
+          "runtime": "Data Science Pipelines",
+          "pipeline_defaults": {
+            "kubernetes_shared_mem_size": {},
+            "kubernetes_pod_labels": [],
+            "mounted_volumes": [],
+            "kubernetes_tolerations": [],
+            "kubernetes_pod_annotations": [],
+            "kubernetes_secrets": [],
+            "env_vars": [],
+            "runtime_image": "quay.io/modh/odh-pipeline-runtime-minimal-cpu-py311-ubi9@sha256:23372eb8b753bcbd3b6b60cddcb9e459da96e52a458c6d2e99b364fd325478c1"
+          },
+          "description": "A Demo Pipeline that Finetunes a YOLO v11 model to recognize Drones in images",
+          "pipeline_parameters": []
+        }
+      },
+      "runtime_ref": ""
+    }
+  ],
+  "schemas": []
+}
