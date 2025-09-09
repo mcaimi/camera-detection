@@ -10,3 +10,4 @@ jupyter/training.yaml
 *.local
 .DS_Store
 .*
+**runs/**
