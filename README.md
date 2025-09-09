@@ -29,7 +29,16 @@ Currently, there is the need for manual secret creation for pipelines to work:
 - a secret called 'yolo-kaggle' containing username/key pairs to access kaggle APIs
 - a secret called 'huggingface-secret' containing the HuggingFace API Token
 
+For example:
+
+```bash
+$ oc create secret generic yolo-kaggle --from-literal=KAGGLE_USERNAME=username --from-literal=KAGGLE_KEY=apikey --from-literal=DATASET_NAME=kaggle_dataset_name
+$ oc create secret generic huggingface-secret --from-literal=HF_TOKEN=hf_api_token
+```
+
 Also, the 'pipeline-pvc' persistent volume needs to be created manually before any run.
+
+Elyra pipeline steps also need to be configured in Jupyter before running them. In particular, step 3 and 4 of the pipeline need adjustment in environment variables to suit to the environment.
 
 ### TODO
 
