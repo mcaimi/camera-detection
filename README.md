@@ -33,7 +33,7 @@ For example:
 
 ```bash
 $ oc create secret generic yolo-kaggle --from-literal=KAGGLE_USERNAME=username --from-literal=KAGGLE_KEY=apikey --from-literal=DATASET_NAME=kaggle_dataset_name
-$ oc create secret generic huggingface-secret --from-literal=HF_TOKEN=hf_api_token
+$ oc create secret generic huggingface-secret --from-literal=HF_TOKEN=hf_api_token --from-literal=HF_HOME=hf_home_path
 ```
 
 Also, the 'pipeline-pvc' persistent volume needs to be created manually before any run.
