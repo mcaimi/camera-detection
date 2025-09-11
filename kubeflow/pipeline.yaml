@@ -1,0 +1,502 @@
+# PIPELINE DEFINITION
+# Name: yolo-custom-training-pipeline
+# Description: Dense Neural Network CNN Image Detector based on YOLO
+# Inputs:
+#    author_name: str
+#    cluster_domain: str
+#    data_mount_path: str
+#    dataset_name: str
+#    huggingface_repo: str
+#    hyperparameters: dict
+#    model_name: str
+#    prod_flag: bool
+#    s3_deployment_name: str
+#    s3_region: str
+#    version: str
+components:
+  comp-fetch-data:
+    executorLabel: exec-fetch-data
+    inputDefinitions:
+      parameters:
+        dataset_name:
+          parameterType: STRING
+        version:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-fetch-model:
+    executorLabel: exec-fetch-model
+    inputDefinitions:
+      parameters:
+        hyperparameters:
+          parameterType: STRUCT
+        model_name:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        original_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+  comp-train-model:
+    executorLabel: exec-train-model
+    inputDefinitions:
+      artifacts:
+        dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        original_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        data_mount_path:
+          parameterType: STRING
+        hyperparameters:
+          parameterType: STRUCT
+    outputDefinitions:
+      artifacts:
+        finetuned_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+  comp-unzip-dataset:
+    executorLabel: exec-unzip-dataset
+    inputDefinitions:
+      artifacts:
+        dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        data_dir:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        dataset_properties:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+  comp-unzip-model:
+    executorLabel: exec-unzip-model
+    inputDefinitions:
+      artifacts:
+        model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        data_dir:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        model_properties:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+deploymentSpec:
+  executors:
+    exec-fetch-data:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - fetch_data
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.12.2'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'kagglehub'\
+          \ 'python-dotenv' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef fetch_data(\n    dataset_name: str,\n    version: str,\n    dataset:\
+          \ Output[Dataset]\n):\n    # import libs\n    import os\n    try:\n    \
+          \    import kagglehub\n    except Exception as e:\n        print(f\"Caught\
+          \ exception {e}\")\n\n    # Check environment\n    KG_USER = os.getenv('KAGGLE_USERNAME')\n\
+          \    KG_PASS = os.getenv('KAGGLE_KEY')\n    KG_PATH = os.getenv('KAGGLEHUB_CACHE')\n\
+          \n    print(f\"Connecting to Kaggle as {KG_USER} with API Key {KG_PASS},\
+          \ save artifacts to {KG_PATH}\")\n\n    # download dataset from kaggle now\n\
+          \    DATASET_NAME: str = dataset_name\n    TRAINING_DATASET_PATH: str =\
+          \ KG_PATH\n\n    # get the dataset\n    print(f\"Dataset '{DATASET_NAME}'\
+          \ will be downloaded to {TRAINING_DATASET_PATH}\")\n    dspath: str = kagglehub.dataset_download(DATASET_NAME)\n\
+          \    print(f\"Dataset available @{dspath}\")\n\n    # zip the dataset\n\
+          \    import zipfile\n    from pathlib import Path\n\n    # save output dataset\
+          \ to S3\n    dataset.path += \".zip\"\n    srcdir = Path(dspath)\n\n   \
+          \ with zipfile.ZipFile(dataset.path, \"w\", zipfile.ZIP_DEFLATED) as zip_file:\n\
+          \        for entry in srcdir.rglob(\"*\"):\n            zip_file.write(entry,\
+          \ entry.relative_to(srcdir))\n\n"
+        image: python:3.11
+    exec-fetch-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - fetch_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.12.2'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'huggingface_hub'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef fetch_model(\n    model_name: str,\n    hyperparameters: dict,\n\
+          \    original_model: Output[Model],\n):\n    try:\n        import os\n \
+          \       import zipfile\n        from pathlib import Path\n        import\
+          \ huggingface_hub as hf\n    except Exception as e:\n        raise e\n\n\
+          \    HF_TOKEN: str = os.getenv(\"HF_TOKEN\")\n\n    # Download model checkpoint\
+          \ from HuggingFace repositories\n    yolo_path: str = \"/\".join((\"/tmp/\"\
+          , model_name))\n    os.makedirs(yolo_path, exist_ok=True)\n\n    print(f\"\
+          Downloading model checkpoint: {model_name}\")\n    model_path = hf.snapshot_download(repo_id=model_name,\n\
+          \                                    allow_patterns=hyperparameters.get(\"\
+          checkpoint\"),\n                                    revision=\"main\",\n\
+          \                                    token=HF_TOKEN,\n                 \
+          \                   local_dir=yolo_path)\n\n    # save output dataset to\
+          \ S3\n    original_model._set_path(original_model.path + \".zip\")\n   \
+          \ srcdir = Path(yolo_path)\n\n    with zipfile.ZipFile(original_model.path,\
+          \ \"w\", zipfile.ZIP_DEFLATED) as zip_file:\n        for entry in srcdir.rglob(\"\
+          *\"):\n            zip_file.write(entry, entry.relative_to(srcdir))\n\n"
+        image: python:3.11
+    exec-train-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.12.2'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_model(\n    original_model: Input[Model],\n    dataset:\
+          \ Input[Dataset],\n    hyperparameters: dict,\n    data_mount_path: str,\n\
+          \    finetuned_model: Output[Model],\n):\n    import ultralytics\n    import\
+          \ yaml\n    import json\n    import os\n    import torch.cuda as tc\n  \
+          \  import pprint\n\n    # Training Parameters\n    JOB = hyperparameters.get(\"\
+          job\")\n    RUN_NAME = hyperparameters.get(\"run_name\")\n    TRAINING_CONFIG\
+          \ = hyperparameters.get(\"training_job_descriptor\")\n    CHECKPOINT = hyperparameters.get(\"\
+          checkpoint\")\n    EPOCHS = hyperparameters.get(\"epochs\")\n    LR = hyperparameters.get(\"\
+          learning_rate\")\n    IMG_SIZE = hyperparameters.get(\"img_size\")\n   \
+          \ BATCH = hyperparameters.get(\"batch\")\n    OPTIMIZER = hyperparameters.get(\"\
+          optimizer\")\n    AUGMENT = hyperparameters.get(\"augment\")\n\n    # detect\
+          \ device\n    device = \"cpu\"\n    if tc.is_available():\n        device\
+          \ = \"cuda\"\n\n    cp: str = f\"{data_mount_path}/{CHECKPOINT}\"\n    tc:\
+          \ str = f\"{data_mount_path}/{TRAINING_CONFIG}\"\n    print(f\"DEVICE:\\\
+          n Training model {cp} on {device}\")\n\n    # load model\n    yolo_model\
+          \ = ultralytics.YOLO(cp)\n    yolo_model.to(device)\n\n    # fix training\
+          \ descriptor\n    with open(tc, \"r\") as training_descriptor_r:\n     \
+          \   training_parms = yaml.safe_load(training_descriptor_r)\n    # update\
+          \ base path\n    training_parms[\"path\"] = os.path.dirname(tc)\n    # dump\
+          \ parms\n    pprint.pprint(training_parms)\n    # write descriptor back\n\
+          \    with open(tc, \"w\") as training_descriptor_w:\n        yaml.dump(training_parms,\
+          \ training_descriptor_w)\n\n    # fix run_dir path\n    with open(\"/.config/Ultralytics/settings.json\"\
+          , \"r\") as yolo_settings:\n        ys = json.load(yolo_settings)\n    ys[\"\
+          runs_dir\"] = f\"{data_mount_path}/runs/{JOB}/{RUN_NAME}\"\n    ys[\"datasets_dir\"\
+          ] = f\"{data_mount_path}/datasets/{JOB}/{RUN_NAME}\"\n    ys[\"weights_dir\"\
+          ] = f\"{data_mount_path}/weights/{JOB}/{RUN_NAME}\"\n    pprint.pprint(ys)\n\
+          \    with open(\"/.config/Ultralytics/settings.json\", \"w\") as yolo_settings:\n\
+          \        json.dump(ys, yolo_settings)\n\n    # start training!\n    yolo_model.train(data=tc,\n\
+          \                     epochs=EPOCHS, lr0=LR, imgsz=IMG_SIZE, batch=BATCH,\n\
+          \                     resume=False, optimizer=OPTIMIZER, augment=AUGMENT,\n\
+          \                     project=data_mount_path)\n\n    # validate\n    training_metrics\
+          \ = yolo_model.val()\n\n    # convert to ONNX\n    yolo_model.export(format=\"\
+          onnx\")\n\n"
+        image: ultralytics/ultralytics:latest
+        resources:
+          cpuLimit: 8.0
+          memoryLimit: 24.0
+          resourceCpuLimit: '8'
+          resourceMemoryLimit: 24G
+    exec-unzip-dataset:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - unzip_dataset
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.12.2'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef unzip_dataset(\n    data_dir: str,\n    dataset: Input[Dataset],\n\
+          \    dataset_properties: Output[Artifact]\n):\n    # import zipfile lib\n\
+          \    import json\n    from pathlib import PosixPath\n    from zipfile import\
+          \ ZipFile\n\n    with ZipFile(dataset.path, 'r') as compressed_dataset:\n\
+          \        compressed_dataset.extractall(data_dir)\n\n    # save dataset properties\n\
+          \    properties = {\n        \"dataset_filename\": dataset.path,\n     \
+          \   \"number_of_elements\": len(list(PosixPath(data_dir).rglob(\"*\")))\n\
+          \    }\n\n    dataset_properties.path += \".json\"\n    with open(dataset_properties.path,\
+          \ \"w\") as artifact_dump:\n        json.dump(properties, artifact_dump)\n\
+          \n"
+        image: python:3.11
+    exec-unzip-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - unzip_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.12.2'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef unzip_model(\n    data_dir: str,\n    model: Input[Model],\n\
+          \    model_properties: Output[Artifact]\n):\n    # import zipfile lib\n\
+          \    import json\n    import os\n    from pathlib import PosixPath\n   \
+          \ from zipfile import ZipFile\n\n    with ZipFile(model.path, 'r') as compressed_model:\n\
+          \        compressed_model.extractall(data_dir)\n\n    # save dataset properties\n\
+          \    properties = {\n        \"model_filename\": model.path,\n        #\"\
+          model_size\": os.path.getsize(PosixPath(data_dir).rglob(\"yolo11x.pt\"))\n\
+          \    }\n\n    model_properties.path += \".json\"\n    with open(model_properties.path,\
+          \ \"w\") as artifact_dump:\n        json.dump(properties, artifact_dump)\n\
+          \n"
+        image: python:3.11
+pipelineInfo:
+  description: Dense Neural Network CNN Image Detector based on YOLO
+  name: yolo-custom-training-pipeline
+root:
+  dag:
+    tasks:
+      fetch-data:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-fetch-data
+        inputs:
+          parameters:
+            dataset_name:
+              componentInputParameter: dataset_name
+            version:
+              componentInputParameter: version
+        taskInfo:
+          name: fetch-data
+      fetch-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-fetch-model
+        inputs:
+          parameters:
+            hyperparameters:
+              componentInputParameter: hyperparameters
+            model_name:
+              componentInputParameter: huggingface_repo
+        taskInfo:
+          name: fetch-model
+      train-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-model
+        dependentTasks:
+        - fetch-data
+        - fetch-model
+        - unzip-dataset
+        - unzip-model
+        inputs:
+          artifacts:
+            dataset:
+              taskOutputArtifact:
+                outputArtifactKey: dataset
+                producerTask: fetch-data
+            original_model:
+              taskOutputArtifact:
+                outputArtifactKey: original_model
+                producerTask: fetch-model
+          parameters:
+            data_mount_path:
+              componentInputParameter: data_mount_path
+            hyperparameters:
+              componentInputParameter: hyperparameters
+        taskInfo:
+          name: train-model
+      unzip-dataset:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-unzip-dataset
+        dependentTasks:
+        - fetch-data
+        inputs:
+          artifacts:
+            dataset:
+              taskOutputArtifact:
+                outputArtifactKey: dataset
+                producerTask: fetch-data
+          parameters:
+            data_dir:
+              componentInputParameter: data_mount_path
+        taskInfo:
+          name: unzip-dataset
+      unzip-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-unzip-model
+        dependentTasks:
+        - fetch-model
+        - unzip-dataset
+        inputs:
+          artifacts:
+            model:
+              taskOutputArtifact:
+                outputArtifactKey: original_model
+                producerTask: fetch-model
+          parameters:
+            data_dir:
+              componentInputParameter: data_mount_path
+        taskInfo:
+          name: unzip-model
+  inputDefinitions:
+    parameters:
+      author_name:
+        parameterType: STRING
+      cluster_domain:
+        parameterType: STRING
+      data_mount_path:
+        parameterType: STRING
+      dataset_name:
+        parameterType: STRING
+      huggingface_repo:
+        parameterType: STRING
+      hyperparameters:
+        parameterType: STRUCT
+      model_name:
+        parameterType: STRING
+      prod_flag:
+        parameterType: BOOLEAN
+      s3_deployment_name:
+        parameterType: STRING
+      s3_region:
+        parameterType: STRING
+      version:
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.12.2
+---
+platforms:
+  kubernetes:
+    deploymentSpec:
+      executors:
+        exec-fetch-data:
+          secretAsEnv:
+          - keyToEnv:
+            - envVar: HF_HOME
+              secretKey: HF_HOME
+            - envVar: HF_TOKEN
+              secretKey: HF_TOKEN
+            secretName: huggingface-secret
+            secretNameParameter:
+              runtimeValue:
+                constant: huggingface-secret
+        exec-fetch-model:
+          secretAsEnv:
+          - keyToEnv:
+            - envVar: KAGGLE_USERNAME
+              secretKey: KAGGLE_USERNAME
+            - envVar: KAGGLE_KEY
+              secretKey: KAGGLE_KEY
+            - envVar: KAGGLEHUB_CACHE
+              secretKey: KAGGLEHUB_CACHE
+            secretName: yolo-kaggle
+            secretNameParameter:
+              runtimeValue:
+                constant: yolo-kaggle
+        exec-train-model:
+          pvcMount:
+          - constant: training
+            mountPath: /data
+            pvcNameParameter:
+              runtimeValue:
+                constant: training
+        exec-unzip-dataset:
+          pvcMount:
+          - constant: training
+            mountPath: /data
+            pvcNameParameter:
+              runtimeValue:
+                constant: training
+        exec-unzip-model:
+          pvcMount:
+          - constant: training
+            mountPath: /data
+            pvcNameParameter:
+              runtimeValue:
+                constant: training
