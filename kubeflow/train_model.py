@@ -4,7 +4,8 @@ from kfp.dsl import (
     Input,
     Output,
     Dataset,
-    Model
+    Model,
+    Artifact,
 )
 
 
@@ -15,6 +16,7 @@ def train_model(
     hyperparameters: dict,
     data_mount_path: str,
     finetuned_model: Output[Model],
+    training_metrics: Output[Artifact],
 ):
     import ultralytics
     import yaml
@@ -22,6 +24,7 @@ def train_model(
     import os
     import torch.cuda as tc
     import pprint
+    from pathlib import PosixPath
 
     # Training Parameters
     JOB = hyperparameters.get("job")
@@ -78,5 +81,11 @@ def train_model(
     # validate
     training_metrics = yolo_model.val()
 
-    # convert to ONNX
-    yolo_model.export(format="onnx")
+    # save model to s3
+    finetuned_model._set_path(finetuned_model.path + ".zip")
+    last_file: str = max(PosixPath(data_mount_path).rglob("last.pt"), key=os.path.getmtime)
+
+    # zip & store
+    import zipfile
+    with zipfile.ZipFile(finetuned_model.path, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        zip_file.write(last_file)

@@ -9,6 +9,8 @@ from kfp import kubernetes
 from fetch_data import fetch_data, fetch_model
 from persistent_data import unzip_dataset, unzip_model
 from train_model import train_model
+from convert_model import convert_model
+from save_model import push_to_model_registry
 
 
 # Pipeline definition
@@ -109,6 +111,48 @@ def training_pipeline(hyperparameters: dict,
     train_model_task.after(unzip_model_task)
     train_model_task.after(unzip_dataset_task)
 
+    # convert to onnx
+    convert_onnx_task = convert_model(data_dir=data_mount_path,
+                                      finetuned_model=train_model_task.outputs["finetuned_model"])
+    convert_onnx_task.set_cpu_limit("8")
+    convert_onnx_task.set_memory_limit("24G")
+    # mount persistent volume...
+    kubernetes.mount_pvc(
+        convert_onnx_task,
+        pvc_name='training',
+        mount_path="/data",
+    )
+    convert_onnx_task.after(train_model_task)
+
+    # save to model registry
+    model_registry_task = push_to_model_registry(
+        model_name=model_name,
+        version=version,
+        cluster_domain=cluster_domain,
+        s3_deployment_name=s3_deployment_name,
+        s3_region=s3_region,
+        author_name=author_name,
+        data_path=data_mount_path,
+    )
+    kubernetes.use_secret_as_env(
+        model_registry_task,
+        secret_name=data_connection_secret_name,
+        secret_key_to_env={
+            'AWS_S3_ENDPOINT': 'AWS_S3_ENDPOINT',
+            'AWS_ACCESS_KEY_ID': 'AWS_ACCESS_KEY_ID',
+            'AWS_SECRET_ACCESS_KEY': 'AWS_SECRET_ACCESS_KEY',
+            'AWS_S3_BUCKET': 'AWS_S3_BUCKET',
+            'AWS_DEFAULT_REGION': 'AWS_DEFAULT_REGION',
+        },
+    )
+    # mount persistent volume...
+    kubernetes.mount_pvc(
+        model_registry_task,
+        pvc_name='training',
+        mount_path="/data",
+    )
+    model_registry_task.after(convert_onnx_task)
+
     # remove pvc after pipeline completes
     #delete_datadisk = kubernetes.DeletePVC(
     #    pvc_name=data_disk.outputs['name']
@@ -131,13 +175,13 @@ if __name__ == '__main__':
             "augment": True,
             "training_job_descriptor": "military/aircraft_names.yaml",
         },
-        "model_name": "yolo-custom-finetuned",
+        "model_name": "yolo-military-finetuned",
         "dataset_name": "rookieengg/military-aircraft-detection-dataset-yolo-format",
         "version": "1",
         "s3_deployment_name": "minio-s3-s3-minio-dev",
         "s3_region": "us",
         "author_name": "DevOps Team",
-        "cluster_domain": "apps.xxx-yyy.local",
+        "cluster_domain": "apps.prod.rhoai.rh-aiservices-bu.com",
         "huggingface_repo": "Ultralytics/YOLO11",
         "data_mount_path": "/data",
         "prod_flag": False

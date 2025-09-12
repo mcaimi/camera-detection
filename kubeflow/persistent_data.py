@@ -52,7 +52,8 @@ def unzip_model(
     # save dataset properties
     properties = {
         "model_filename": model.path,
-        #"model_size": os.path.getsize(PosixPath(data_dir).rglob("yolo11x.pt"))
+        "model_architecture": "YOLOv11",
+        "framework": "torch",
     }
 
     model_properties.path += ".json"
