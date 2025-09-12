@@ -14,6 +14,23 @@
 #    s3_region: str
 #    version: str
 components:
+  comp-convert-model:
+    executorLabel: exec-convert-model
+    inputDefinitions:
+      artifacts:
+        finetuned_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        data_dir:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        onnx_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
   comp-fetch-data:
     executorLabel: exec-fetch-data
     inputDefinitions:
@@ -42,6 +59,24 @@ components:
           artifactType:
             schemaTitle: system.Model
             schemaVersion: 0.0.1
+  comp-push-to-model-registry:
+    executorLabel: exec-push-to-model-registry
+    inputDefinitions:
+      parameters:
+        author_name:
+          parameterType: STRING
+        cluster_domain:
+          parameterType: STRING
+        data_path:
+          parameterType: STRING
+        model_name:
+          parameterType: STRING
+        s3_deployment_name:
+          parameterType: STRING
+        s3_region:
+          parameterType: STRING
+        version:
+          parameterType: STRING
   comp-train-model:
     executorLabel: exec-train-model
     inputDefinitions:
@@ -64,6 +99,10 @@ components:
         finetuned_model:
           artifactType:
             schemaTitle: system.Model
+            schemaVersion: 0.0.1
+        training_metrics:
+          artifactType:
+            schemaTitle: system.Artifact
             schemaVersion: 0.0.1
   comp-unzip-dataset:
     executorLabel: exec-unzip-dataset
@@ -101,6 +140,52 @@ components:
             schemaVersion: 0.0.1
 deploymentSpec:
   executors:
+    exec-convert-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - convert_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.12.2'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef convert_model(\n    data_dir: str,\n    finetuned_model: Input[Model],\n\
+          \    onnx_model: Output[Model],\n):\n    from zipfile import ZipFile\n \
+          \   from pathlib import PosixPath\n    import os\n\n    # Unzip source model\n\
+          \    workdir: str = \"/\".join((data_dir, \"onnx\"))\n    os.makedirs(workdir,\
+          \ exist_ok=True)\n    with ZipFile(finetuned_model.path, 'r') as compressed_model:\n\
+          \        compressed_model.extractall(workdir)\n\n    # convert & save model\
+          \ to onnx\n    from ultralytics import YOLO\n    weights_file: str = max(PosixPath(workdir).rglob(\"\
+          last.pt\"), key=os.path.getmtime)\n    torch_model = YOLO(weights_file)\n\
+          \    torch_model.export(format=\"onnx\")\n\n    # save model to s3\n   \
+          \ onnx_model._set_path(onnx_model.path + \"-onnx.zip\")\n    last_file:\
+          \ str = max(PosixPath(workdir).rglob(\"*.onnx\"), key=os.path.getmtime)\n\
+          \n    # zip & store\n    import zipfile\n    with zipfile.ZipFile(onnx_model.path,\
+          \ \"w\", zipfile.ZIP_DEFLATED) as zip_file:\n        zip_file.write(last_file)\n\
+          \n"
+        image: quay.io/marcocaimi/ultralytics-onnx:latest
+        resources:
+          cpuLimit: 8.0
+          memoryLimit: 24.0
+          resourceCpuLimit: '8'
+          resourceMemoryLimit: 24G
     exec-fetch-data:
       container:
         args:
@@ -189,6 +274,110 @@ deploymentSpec:
           \ \"w\", zipfile.ZIP_DEFLATED) as zip_file:\n        for entry in srcdir.rglob(\"\
           *\"):\n            zip_file.write(entry, entry.relative_to(srcdir))\n\n"
         image: python:3.11
+    exec-push-to-model-registry:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - push_to_model_registry
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.12.2'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'pip==24.2'\
+          \ 'setuptools==74.1.3' 'boto3==1.36.12' 'model-registry' && \"$0\" \"$@\"\
+          \n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef push_to_model_registry(\n    model_name: str,\n    version: str,\n\
+          \    cluster_domain: str,\n    s3_deployment_name: str,\n    s3_region:\
+          \ str,\n    author_name: str,\n    data_path: str,\n):\n    from model_registry\
+          \ import ModelRegistry\n    from model_registry.utils import S3Params\n\
+          \    from model_registry.exceptions import StoreError\n    from pathlib\
+          \ import PosixPath\n    import os\n\n    # environment setup\n    from os\
+          \ import environ\n    environ[\"KF_PIPELINES_SA_TOKEN_PATH\"] = \"/var/run/secrets/kubernetes.io/serviceaccount/token\"\
+          \n\n    # Set up the model registry connection\n    s3_deployment = s3_deployment_name\n\
+          \    model_registry_url = f\"https://registry-rest.{cluster_domain}\"\n\
+          \    minio_endpoint = f\"https://{s3_deployment}.{cluster_domain}\"\n\n\
+          \    # registry connection object\n    registry = ModelRegistry(server_address=model_registry_url,\
+          \ port=443, author=author_name, is_secure=False)\n\n    # Model details\
+          \ we want to register\n    registered_model_name = model_name\n    s3_model_bucket\
+          \ = \"models\"\n    s3_model_prefix = f\"{s3_model_bucket}/{registered_model_name}\"\
+          \n    version = version\n\n    # remote S3 paths\n    s3_region = s3_region,\n\
+          \    s3_onnx = f\"{s3_model_prefix}/onnx/{registered_model_name}\"\n   \
+          \ s3_torch = f\"{s3_model_prefix}/torch/{registered_model_name}\"\n\n  \
+          \  # upload parameters for s3 connections\n    s3_upload_params_onnx = S3Params(\n\
+          \        bucket_name=os.environ.get('AWS_S3_BUCKET'),\n        s3_prefix=f\"\
+          {s3_onnx}/{version}\",\n    )\n    s3_upload_params_torch = S3Params(\n\
+          \        bucket_name=os.environ.get('AWS_S3_BUCKET'),\n        s3_prefix=f\"\
+          {s3_torch}/{version}\",\n    )\n\n    # artifact update function\n    def\
+          \ update_artifact(model_name, model_version, new_uri, storage_path):\n \
+          \       artifact = registry.get_model_artifact(model_name, model_version)\n\
+          \        print(f\"Got Artifact {artifact.name} with ID: {artifact.id}\\\
+          n Current URI: {artifact.uri}\\n Updating with URI: {new_uri}\\n Current\
+          \ StoragePath: {artifact.storage_path}\")\n        artifact.uri = new_uri\n\
+          \        artifact.storage_path = storage_path\n        registry.update(artifact)\n\
+          \n    # upload function\n    def register(model_name, data_path,\n     \
+          \            model_format_name, author, model_format_version,\n        \
+          \         model_version, storage_path, description,\n                 metadata,\
+          \ upload_parms):\n        try:\n            # register onnx model\n    \
+          \        registered_model = registry.upload_artifact_and_register_model(\n\
+          \                name=model_name,\n                model_files_path=data_path,\n\
+          \                model_format_name=model_format_name,\n                author=author,\n\
+          \                model_format_version=model_format_version,\n          \
+          \      version=model_version,\n                storage_path=storage_path,\n\
+          \                description=description,\n                metadata=metadata,\n\
+          \                upload_params=upload_parms\n            )\n           \
+          \ print(f\"'{model_name}' version '{model_version}'\\n URL: https://rhods-dashboard-redhat-ods-applications.{cluster_domain}/modelRegistry/registry/registeredModels/1/versions/{registry.get_model_version(model_name,\
+          \ model_version).id}/details\")\n        except StoreError:\n          \
+          \  stored_version = registry.get_model_version(registered_model_name, f\"\
+          {version}-onnx\")\n            print(f\"Model version {stored_version.name}-{stored_version.id}\
+          \ already exists: Updating URI...\")\n            new_uri = f\"s3://{storage_path}?endpoint={minio_endpoint}&defaultRegion={s3_region}\"\
+          \n            update_artifact(model_name, model_version, new_uri, storage_path)\n\
+          \n    # get & unzip checkpoints from pipeline storage\n    torch_file: str\
+          \ = max(PosixPath(data_path).rglob(\"last.pt\"), key=os.path.getmtime)\n\
+          \    onnx_file: str = max(PosixPath(data_path).rglob(\"last.onnx\"), key=os.path.getmtime)\n\
+          \n    # data to register in the model registry\n    models = [\n       \
+          \ {\n            \"model_name\": registered_model_name,\n            \"\
+          data_path\": onnx_file,\n            \"author\": author_name,\n        \
+          \    \"model_format_name\": \"onnx\",\n            \"model_format_version\"\
+          : \"1\",\n            \"model_version\": f\"{version}-onnx\",\n        \
+          \    \"storage_path\": f\"{s3_model_bucket}/{s3_onnx}\",\n            \"\
+          description\": \"Dense Neural Network trained on music data (ONNX)\",\n\
+          \            \"metadata\": {\n                        \"format\": \"onnx\"\
+          ,\n                        \"license\": \"apache-2.0\"\n               \
+          \     },\n            \"upload_parms\": s3_upload_params_onnx\n        },\n\
+          \        {\n            \"model_name\": registered_model_name,\n       \
+          \     \"data_path\": torch_file,\n            \"author\": author_name,\n\
+          \            \"model_format_name\": \"torch\",\n            \"model_format_version\"\
+          : \"1\",\n            \"model_version\": f\"{version}-torch\",\n       \
+          \     \"storage_path\": f\"{s3_model_bucket}/{s3_torch}\",\n           \
+          \ \"description\": \"Dense Neural Network trained on music data (TORCH)\"\
+          ,\n            \"metadata\": {\n                        \"format\": \"torch\"\
+          ,\n                        \"license\": \"apache-2.0\"\n               \
+          \     },\n            \"upload_parms\": s3_upload_params_torch\n       \
+          \ }\n    ]\n\n    # register models\n    for model in models:\n        print(f\"\
+          Registering: {model.get('model_version')}...\")\n        register(model_name=model.get('model_name'),\n\
+          \                 data_path=model.get('data_path'),\n                 model_format_name=model.get('model_format_name'),\n\
+          \                 author=model.get('author'),\n                 model_format_version=model.get('model_format_version'),\n\
+          \                 model_version=model.get('model_version'),\n          \
+          \       storage_path=model.get('storage_path'),\n                 description=model.get('description'),\n\
+          \                 metadata=model.get('metadata'),\n                 upload_parms=model.get('upload_parms'))\n\
+          \n    print(\"Model registered successfully\")\n\n"
+        image: python:3.11
     exec-train-model:
       container:
         args:
@@ -217,9 +406,10 @@ deploymentSpec:
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
           \ *\n\ndef train_model(\n    original_model: Input[Model],\n    dataset:\
           \ Input[Dataset],\n    hyperparameters: dict,\n    data_mount_path: str,\n\
-          \    finetuned_model: Output[Model],\n):\n    import ultralytics\n    import\
-          \ yaml\n    import json\n    import os\n    import torch.cuda as tc\n  \
-          \  import pprint\n\n    # Training Parameters\n    JOB = hyperparameters.get(\"\
+          \    finetuned_model: Output[Model],\n    training_metrics: Output[Artifact],\n\
+          ):\n    import ultralytics\n    import yaml\n    import json\n    import\
+          \ os\n    import torch.cuda as tc\n    import pprint\n    from pathlib import\
+          \ PosixPath\n\n    # Training Parameters\n    JOB = hyperparameters.get(\"\
           job\")\n    RUN_NAME = hyperparameters.get(\"run_name\")\n    TRAINING_CONFIG\
           \ = hyperparameters.get(\"training_job_descriptor\")\n    CHECKPOINT = hyperparameters.get(\"\
           checkpoint\")\n    EPOCHS = hyperparameters.get(\"epochs\")\n    LR = hyperparameters.get(\"\
@@ -242,12 +432,15 @@ deploymentSpec:
           ] = f\"{data_mount_path}/datasets/{JOB}/{RUN_NAME}\"\n    ys[\"weights_dir\"\
           ] = f\"{data_mount_path}/weights/{JOB}/{RUN_NAME}\"\n    pprint.pprint(ys)\n\
           \    with open(\"/.config/Ultralytics/settings.json\", \"w\") as yolo_settings:\n\
-          \        json.dump(ys, yolo_settings)\n\n    # start training!\n    yolo_model.train(data=tc,\n\
-          \                     epochs=EPOCHS, lr0=LR, imgsz=IMG_SIZE, batch=BATCH,\n\
-          \                     resume=False, optimizer=OPTIMIZER, augment=AUGMENT,\n\
-          \                     project=data_mount_path)\n\n    # validate\n    training_metrics\
-          \ = yolo_model.val()\n\n    # convert to ONNX\n    yolo_model.export(format=\"\
-          onnx\")\n\n"
+          \        json.dump(ys, yolo_settings)\n\n    # start training!\n    #yolo_model.train(data=tc,\n\
+          \    #                 epochs=EPOCHS, lr0=LR, imgsz=IMG_SIZE, batch=BATCH,\n\
+          \    #                 resume=False, optimizer=OPTIMIZER, augment=AUGMENT,\n\
+          \    #                 project=data_mount_path)\n\n    # validate\n    #training_metrics\
+          \ = yolo_model.val()\n\n    # save model to s3\n    finetuned_model._set_path(finetuned_model.path\
+          \ + \".zip\")\n    last_file: str = max(PosixPath(data_mount_path).rglob(\"\
+          last.pt\"), key=os.path.getmtime)\n\n    # zip & store\n    import zipfile\n\
+          \    with zipfile.ZipFile(finetuned_model.path, \"w\", zipfile.ZIP_DEFLATED)\
+          \ as zip_file:\n        zip_file.write(last_file)\n\n"
         image: ultralytics/ultralytics:latest
         resources:
           cpuLimit: 8.0
@@ -322,8 +515,8 @@ deploymentSpec:
           \    import json\n    import os\n    from pathlib import PosixPath\n   \
           \ from zipfile import ZipFile\n\n    with ZipFile(model.path, 'r') as compressed_model:\n\
           \        compressed_model.extractall(data_dir)\n\n    # save dataset properties\n\
-          \    properties = {\n        \"model_filename\": model.path,\n        #\"\
-          model_size\": os.path.getsize(PosixPath(data_dir).rglob(\"yolo11x.pt\"))\n\
+          \    properties = {\n        \"model_filename\": model.path,\n        \"\
+          model_architecture\": \"YOLOv11\",\n        \"framework\": \"torch\",\n\
           \    }\n\n    model_properties.path += \".json\"\n    with open(model_properties.path,\
           \ \"w\") as artifact_dump:\n        json.dump(properties, artifact_dump)\n\
           \n"
@@ -334,6 +527,24 @@ pipelineInfo:
 root:
   dag:
     tasks:
+      convert-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-convert-model
+        dependentTasks:
+        - train-model
+        inputs:
+          artifacts:
+            finetuned_model:
+              taskOutputArtifact:
+                outputArtifactKey: finetuned_model
+                producerTask: train-model
+          parameters:
+            data_dir:
+              componentInputParameter: data_mount_path
+        taskInfo:
+          name: convert-model
       fetch-data:
         cachingOptions:
           enableCache: true
@@ -360,6 +571,31 @@ root:
               componentInputParameter: huggingface_repo
         taskInfo:
           name: fetch-model
+      push-to-model-registry:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-push-to-model-registry
+        dependentTasks:
+        - convert-model
+        inputs:
+          parameters:
+            author_name:
+              componentInputParameter: author_name
+            cluster_domain:
+              componentInputParameter: cluster_domain
+            data_path:
+              componentInputParameter: data_mount_path
+            model_name:
+              componentInputParameter: model_name
+            s3_deployment_name:
+              componentInputParameter: s3_deployment_name
+            s3_region:
+              componentInputParameter: s3_region
+            version:
+              componentInputParameter: version
+        taskInfo:
+          name: push-to-model-registry
       train-model:
         cachingOptions:
           enableCache: true
@@ -455,6 +691,13 @@ platforms:
   kubernetes:
     deploymentSpec:
       executors:
+        exec-convert-model:
+          pvcMount:
+          - constant: training
+            mountPath: /data
+            pvcNameParameter:
+              runtimeValue:
+                constant: training
         exec-fetch-data:
           secretAsEnv:
           - keyToEnv:
@@ -479,6 +722,29 @@ platforms:
             secretNameParameter:
               runtimeValue:
                 constant: yolo-kaggle
+        exec-push-to-model-registry:
+          pvcMount:
+          - constant: training
+            mountPath: /data
+            pvcNameParameter:
+              runtimeValue:
+                constant: training
+          secretAsEnv:
+          - keyToEnv:
+            - envVar: AWS_S3_ENDPOINT
+              secretKey: AWS_S3_ENDPOINT
+            - envVar: AWS_ACCESS_KEY_ID
+              secretKey: AWS_ACCESS_KEY_ID
+            - envVar: AWS_SECRET_ACCESS_KEY
+              secretKey: AWS_SECRET_ACCESS_KEY
+            - envVar: AWS_S3_BUCKET
+              secretKey: AWS_S3_BUCKET
+            - envVar: AWS_DEFAULT_REGION
+              secretKey: AWS_DEFAULT_REGION
+            secretName: s3-models
+            secretNameParameter:
+              runtimeValue:
+                constant: s3-models
         exec-train-model:
           pvcMount:
           - constant: training
