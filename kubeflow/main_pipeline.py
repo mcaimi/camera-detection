@@ -52,6 +52,7 @@ def training_pipeline(hyperparameters: dict,
 
     # download base model from HF
     fetch_model_task = fetch_model(model_name=huggingface_repo,
+                                   version=version,
                                    hyperparameters=hyperparameters)
     kubernetes.use_secret_as_env(
         fetch_model_task,

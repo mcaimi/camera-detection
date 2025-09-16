@@ -56,6 +56,7 @@ def fetch_data(
            packages_to_install=["huggingface_hub"])
 def fetch_model(
     model_name: str,
+    version: str,
     hyperparameters: dict,
     original_model: Output[Model],
 ):

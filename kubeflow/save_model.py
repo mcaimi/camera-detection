@@ -44,22 +44,22 @@ def push_to_model_registry(
 
     # Model details we want to register
     registered_model_name = model_name
-    s3_model_bucket = "models"
+    s3_model_bucket = os.environ.get('AWS_S3_BUCKET')
     s3_model_prefix = f"{s3_model_bucket}/{registered_model_name}"
     version = version
 
     # remote S3 paths
     s3_region = s3_region,
-    s3_onnx = f"{s3_model_prefix}/onnx/{registered_model_name}"
-    s3_torch = f"{s3_model_prefix}/torch/{registered_model_name}"
+    s3_onnx = f"{s3_model_prefix}/onnx"
+    s3_torch = f"{s3_model_prefix}/torch"
 
     # upload parameters for s3 connections
     s3_upload_params_onnx = S3Params(
-        bucket_name=os.environ.get('AWS_S3_BUCKET'),
+        bucket_name=s3_model_bucket,
         s3_prefix=f"{s3_onnx}/{version}",
     )
     s3_upload_params_torch = S3Params(
-        bucket_name=os.environ.get('AWS_S3_BUCKET'),
+        bucket_name=s3_model_bucket,
         s3_prefix=f"{s3_torch}/{version}",
     )
 
@@ -92,7 +92,7 @@ def push_to_model_registry(
             )
             print(f"'{model_name}' version '{model_version}'\n URL: https://rhods-dashboard-redhat-ods-applications.{cluster_domain}/modelRegistry/registry/registeredModels/1/versions/{registry.get_model_version(model_name, model_version).id}/details")
         except StoreError:
-            stored_version = registry.get_model_version(registered_model_name, f"{version}-onnx")
+            stored_version = registry.get_model_version(registered_model_name, f"{version}")
             print(f"Model version {stored_version.name}-{stored_version.id} already exists: Updating URI...")
             new_uri = f"s3://{storage_path}?endpoint={minio_endpoint}&defaultRegion={s3_region}"
             update_artifact(model_name, model_version, new_uri, storage_path)
@@ -100,7 +100,7 @@ def push_to_model_registry(
     # get & unzip checkpoints from pipeline storage
     torch_file: str = max(PosixPath(data_path).rglob("last.pt"), key=os.path.getmtime)
     onnx_file: str = max(PosixPath(data_path).rglob("last.onnx"), key=os.path.getmtime)
-    
+
     # data to register in the model registry
     models = [
         {
