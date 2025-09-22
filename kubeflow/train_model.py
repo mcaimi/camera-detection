@@ -76,7 +76,7 @@ def train_model(
     yolo_model.train(data=tc,
                      epochs=EPOCHS, lr0=LR, imgsz=IMG_SIZE, batch=BATCH,
                      resume=False, optimizer=OPTIMIZER, augment=AUGMENT,
-                     project=data_mount_path)
+                     project=data_mount_path, amp=False)
 
     # validate
     training_metrics = yolo_model.val()
