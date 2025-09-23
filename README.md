@@ -4,8 +4,8 @@ A toy work-in-progress example on how to run object detection on images/streamin
 
 The project is composed of mainly two distinct pieces:
 
-- A real-time object detection example that analyzes a video stream from a webcam and uses OpenCV and YOLO to perform object detection
 - A couple of Jupyter Notebooks that experiment with YOLO finetuning and OpenCV processing
+- Finetuning pipelines built with Elyra and Kubeflow.
 
 At this point, I am using a public Drone Image dataset found on Kaggle to finetune the YOLO model.
 
