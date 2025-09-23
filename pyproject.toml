@@ -1,7 +1,7 @@
 [project]
-name = "camera-detection"
+name = "image-detection"
 version = "0.1.0"
-description = "Add your description here"
+description = "An image detection demo using YOLOv11, kagglehub, higgingface-hub and Kubeflow"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -10,7 +10,9 @@ dependencies = [
     "ipykernel>=6.30.1",
     "kagglehub>=0.3.13",
     "opencv-python>=4.11.0.86",
+    "pillow>=11.3.0",
     "pip>=25.2",
+    "streamlit>=1.49.1",
     "torch>=2.8.0",
     "ultralytics==8.3.65",
 ]
