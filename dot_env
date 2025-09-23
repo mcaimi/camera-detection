@@ -1,0 +1,2 @@
+INFER_ENDPOINT="http://localhost:8000"
+MODEL_NAME="yolo-finetune°
