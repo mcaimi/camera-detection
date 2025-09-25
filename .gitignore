@@ -11,3 +11,4 @@ jupyter/training.yaml
 .DS_Store
 .*
 **runs/**
+**.mkv
