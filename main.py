@@ -159,21 +159,26 @@ uploaded_file = st.file_uploader("Choose an image", type=["jpg", "jpeg", "png"])
 # Upload FIle
 if uploaded_file is not None:
     # prepare page
-    original, resized = st.columns([2,2], vertical_alignment="top")
+    original, resized, info = st.columns([2,2,1], vertical_alignment="top")
 
     # Show the original image
     image = Image.open(uploaded_file)
-    original.image(image, caption="Original image", width="stretch")
+    original.image(image, caption="Original image", width="content")
 
     # Preprocess
     tensor = preprocess_image(image)  # shape (3,640,640)
-    original.success(f"Pre-processed tensor shape: {tensor.shape}")
+    info.success(f"Pre-processed input tensor shape: {tensor.shape}")
+    img_info = {
+        "source": f"{uploaded_file}",
+        "preprocessed": f"{tensor.shape}"
+    }
+    info.json(img_info, expanded=True)
 
     # Optional: visualise the resized image (after preprocessing)
     resized_vis = Image.fromarray(
         (np.transpose(tensor, (1, 2, 0)) * 255).astype(np.uint8)
     )
-    resized.image(resized_vis, caption="Resized (640x640) preview", width="stretch")
+    resized.image(resized_vis, caption="Resized (640x640) preview", width="content")
 
     # Endpoint configuration (let the user fill these in)
     st.subheader("Openshift AI Model Server Endpoint Configuration")
