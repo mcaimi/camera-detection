@@ -149,7 +149,7 @@ st.html("assets/onnx.html")
 st.write(
     """
     1️⃣ Upload a **JPG** or **PNG** image.  
-    2️⃣ The app resizes it to **(3, 640, 640)** (channels‑first).  
+    2️⃣ The app resizes it to **(3, 640, 640)** (channels-first).  
     3️⃣ The tensor is sent to an OpenVINO inference endpoint of your choice.
     """
 )
@@ -189,13 +189,14 @@ if uploaded_file is not None:
         if auth_token:
             headers["Authorization"] = f"Bearer {auth_token}"
 
-        try:
-            response = rest_request(endpoint_url, headers=headers, data=tensor.tolist())
-            response.raise_for_status()
-            result = response.json()
-            st.success("✅ Inference succeeded!")
-        except requests.exceptions.RequestException as e:
-            st.error(f"❌ Request failed: {e}")
+        with st.spinner("Performing Inference. Please wait..."):
+            try:
+                response = rest_request(endpoint_url, headers=headers, data=tensor.tolist())
+                response.raise_for_status()
+                result = response.json()
+                st.success("✅ Inference succeeded!")
+            except requests.exceptions.RequestException as e:
+                st.error(f"❌ Request failed: {e}")
 
         json_prediction, detection = st.columns([2,2], vertical_alignment="top")
         json_prediction.json(result, expanded=False)  # pretty‑print the server response
